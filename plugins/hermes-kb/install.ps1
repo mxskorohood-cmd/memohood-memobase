@@ -27,7 +27,12 @@
 param(
     # Explicit override -- pass the full path to the hermes venv's python.exe
     # if auto-detection below can't find it (e.g. non-standard install).
-    [string]$PythonPath
+    [string]$PythonPath,
+
+    # ALSO install the local embedder (fastembed, ONNX, no PyTorch) and
+    # pre-download multilingual-e5-large (~2.2 GB), so no CLOUDFLARE_* keys
+    # are needed for embeddings.
+    [switch]$Local
 )
 
 $ErrorActionPreference = "Stop"
@@ -85,6 +90,26 @@ $packages = @(
 if ($LASTEXITCODE -ne 0) {
     Write-Host "MemoBase: установка зависимостей не удалась (см. вывод pip выше)." -ForegroundColor Red
     exit $LASTEXITCODE
+}
+
+if ($Local) {
+    Write-Host ""
+    Write-Host "MemoBase: ставлю локальный эмбеддер (fastembed - ONNX Runtime, без PyTorch)..." -ForegroundColor Cyan
+    & $python -m pip install --upgrade fastembed
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "MemoBase: установка fastembed не удалась (см. вывод pip выше)." -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+    Write-Host "MemoBase: скачиваю модель intfloat/multilingual-e5-large (~2.2 ГБ, один раз)..." -ForegroundColor Cyan
+    & $python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='intfloat/multilingual-e5-large'); print('  локальная модель готова к работе')"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "MemoBase: не удалось скачать локальную модель (см. вывод выше)." -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+    Write-Host "MemoBase: локальный режим установлен. Включите его в config.yaml (memobase.*):" -ForegroundColor Green
+    Write-Host "    memobase:"
+    Write-Host "      embedder: { provider: local, model: intfloat/multilingual-e5-large, dims: 1024 }"
+    Write-Host "  (для памяти MemoHood - те же ключи под memory.memohood.embedder)"
 }
 
 Write-Host ""

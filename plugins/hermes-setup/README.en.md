@@ -15,7 +15,8 @@
   <a href="#faq">FAQ</a> ·
   <a href="README.md">Русский</a> ·
   <a href="https://skorehood.com">skorehood.com</a> ·
-  <a href="https://www.youtube.com/@MaximSkorohood">YouTube</a>
+  <a href="https://www.youtube.com/@MaximSkorohood">YouTube</a> ·
+  <a href="https://t.me/+XrhmiKgCQdY5MjFi">Telegram</a>
 </p>
 
 ---
@@ -187,7 +188,7 @@ Locally: **77 passed**, 0 failed. Every test is fully isolated: `HERMES_HOME` is
 
 ## Made by
 
-Built by **Maxim Vasko** — [skorehood.com](https://skorehood.com) · [YouTube](https://www.youtube.com/@MaximSkorohood)
+Built by **Maxim Vasko** — [skorehood.com](https://skorehood.com) · [YouTube](https://www.youtube.com/@MaximSkorohood) · [Telegram](https://t.me/+XrhmiKgCQdY5MjFi)
 
 ## License
 

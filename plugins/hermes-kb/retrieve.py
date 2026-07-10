@@ -196,7 +196,7 @@ def _vector_search(
         return []
 
     try:
-        vectors = embed_mod.embed_texts([query], collection_cfg)
+        vectors = embed_mod.embed_texts([query], collection_cfg, is_query=True)
     except embed_mod.EmbedError as exc:
         logger.warning("retrieve: query embedding failed (%s); vector leg empty for this query", exc)
         return []

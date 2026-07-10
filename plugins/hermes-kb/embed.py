@@ -202,16 +202,80 @@ def _embed_openai_compat(
 
 
 # ---------------------------------------------------------------------------
+# Local provider (fastembed / ONNX Runtime — NO PyTorch). Opt-in alternative
+# to Cloudflare: downloads a quantized ONNX model once, then runs on CPU, so
+# the query text and snippets never leave the machine. ``fastembed`` is an
+# OPTIONAL dependency, imported lazily and only when embedder.provider=local,
+# so a default (cloud) install never pulls it in. Default model is
+# multilingual-e5-large: 1024 dims (drop-in for the Cloudflare bge-m3 schema),
+# multilingual (RU+EN), MIT-licensed.
+# ---------------------------------------------------------------------------
+
+DEFAULT_LOCAL_MODEL = "intfloat/multilingual-e5-large"
+
+# One TextEmbedding instance per model id, cached for the process lifetime:
+# the first call loads (and, on first run ever, downloads) the ONNX weights;
+# every call after that is in-memory.
+_LOCAL_MODELS: Dict[str, Any] = {}
+
+
+def _get_local_model(model: str):
+    inst = _LOCAL_MODELS.get(model)
+    if inst is None:
+        try:
+            from fastembed import TextEmbedding
+        except ImportError as exc:
+            raise EmbedError(
+                "local embedder needs the optional 'fastembed' package "
+                "(pip install fastembed) — only required when embedder.provider "
+                "is 'local'."
+            ) from exc
+        try:
+            inst = TextEmbedding(model_name=model)
+        except Exception as exc:  # noqa: BLE001 - surface load/download failure as EmbedError
+            raise EmbedError(f"could not load local embed model {model!r}: {exc}") from exc
+        _LOCAL_MODELS[model] = inst
+    return inst
+
+
+def _apply_e5_prefix(texts: List[str], model: str, is_query: bool) -> List[str]:
+    """e5 models are trained with ``query:`` / ``passage:`` prefixes and lose
+    accuracy without them; models without ``e5`` in the id are left as-is."""
+    if "e5" in model.lower():
+        prefix = "query: " if is_query else "passage: "
+        return [prefix + t for t in texts]
+    return list(texts)
+
+
+def _embed_local(texts: List[str], model: str, *, is_query: bool = False) -> List[List[float]]:
+    inst = _get_local_model(model)
+    prepared = _apply_e5_prefix(texts, model, is_query)
+    try:
+        # fastembed yields numpy arrays; return plain Python float lists so
+        # _validate_vectors (list/tuple of finite numbers) and serialize_vector
+        # both keep working unchanged.
+        return [[float(x) for x in vec] for vec in inst.embed(prepared)]
+    except EmbedError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise EmbedError(f"local embedder ({model}) failed: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 
-def embed_texts(texts: List[str], collection_cfg: Dict[str, Any]) -> List[List[float]]:
+def embed_texts(
+    texts: List[str], collection_cfg: Dict[str, Any], *, is_query: bool = False
+) -> List[List[float]]:
     """Embed *texts*, returning one vector per input, in the same order.
 
-    Raises :class:`EmbedError` on any failure — missing credentials,
-    network failure after retries, malformed provider response, or output
-    validation failure (see module docstring). Never records spend itself.
+    ``is_query`` only matters for the local e5 provider (query vs passage
+    prefix); cloud providers ignore it. Raises :class:`EmbedError` on any
+    failure — missing credentials, network failure after retries, malformed
+    provider response, or output validation failure (see module docstring).
+    Never records spend itself.
     """
     if not texts:
         return []
@@ -225,6 +289,8 @@ def embed_texts(texts: List[str], collection_cfg: Dict[str, Any]) -> List[List[f
 
     if provider == "cloudflare":
         vectors = _embed_cloudflare(texts, model)
+    elif provider in ("local", "fastembed"):
+        vectors = _embed_local(texts, embedder.get("model") or DEFAULT_LOCAL_MODEL, is_query=is_query)
     elif provider in ("openai", "openai-compat", "openai_compat"):
         base_url = embedder.get("base_url")
         if not base_url:

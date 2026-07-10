@@ -244,17 +244,19 @@ class TestStepSequencing:
         }
 
     def test_local_embedder_model_mapping(self, kb):
-        assert kb.setup_core.local_embedder_model("1") == "BAAI/bge-m3"
-        assert kb.setup_core.local_embedder_model("2") == "BAAI/bge-small-en-v1.5"
+        # Single supported local model (fastembed, 1024-dim, drop-in for bge-m3).
+        assert kb.setup_core.local_embedder_model("1") == "intfloat/multilingual-e5-large"
+        assert kb.setup_core.local_embedder_model("2") == "intfloat/multilingual-e5-large"
 
     def test_embedder_question_mentions_ram_and_recommends_full_variant(self, kb):
         text = kb.setup_core.embedder_question(16.0)
         assert "16" in text
         assert "вариант 1" in text
 
-    def test_embedder_question_recommends_light_variant_for_low_ram(self, kb):
+    def test_embedder_question_recommends_cloud_for_low_ram(self, kb):
+        # Local e5-large needs ~2 GB RAM; a low-RAM box is steered to cloud.
         text = kb.setup_core.embedder_question(4.0)
-        assert "вариант 2" in text
+        assert "вариант 3" in text
 
     def test_embedder_question_handles_unknown_ram(self, kb):
         text = kb.setup_core.embedder_question(None)

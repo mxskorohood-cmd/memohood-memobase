@@ -420,15 +420,17 @@ def format_dependency_report(report: Dict[str, Any]) -> str:
 
 def embedder_question(ram_gb: Optional[float]) -> str:
     hint = f" (у вас примерно {ram_gb} ГБ RAM)" if ram_gb else ""
-    rec = " — рекомендуется вариант 1" if ram_gb and ram_gb >= 8 else (" — рекомендуется вариант 2" if ram_gb else "")
+    # Local e5-large needs ~2 GB RAM to run; on a low-RAM box recommend cloud.
+    rec = " — рекомендуется вариант 1" if ram_gb and ram_gb >= 8 else (" — здесь мало RAM, рекомендуется вариант 3" if ram_gb else "")
     return (
         "Настройка базы знаний MemoBase.\n"
         "Где считать эмбеддинги? Эмбеддинг — это перевод текста на язык чисел, "
         "чтобы компьютер сравнивал смысл фраз, а не просто буквы."
         f"{hint}{rec}\n"
-        "1 — на этой машине, полное качество (BGE-M3)\n"
-        "2 — на этой машине, полегче\n"
-        "3 — через облако (бесплатные лимиты у некоторых провайдеров)"
+        "1 — на этой машине, локально: модель multilingual-e5-large "
+        "(~2.2 ГБ, скачивается один раз; облачные ключи для эмбеддингов не нужны)\n"
+        "2 — тоже локально (та же модель, что и вариант 1)\n"
+        "3 — через облако: Cloudflare Workers AI (нужен бесплатный API-ключ; ничего не скачивается)"
     )
 
 
@@ -461,5 +463,7 @@ def done_message() -> str:
 
 
 def local_embedder_model(choice: str) -> str:
-    """Map the "1"/"2" local-embedder menu choice to its model id."""
-    return "BAAI/bge-m3" if choice == "1" else "BAAI/bge-small-en-v1.5"
+    """The local-embedder model id. Single supported local model: a fastembed
+    (ONNX, no PyTorch) multilingual model at 1024 dims — a drop-in for the
+    Cloudflare bge-m3 schema. Both menu choices map to it."""
+    return "intfloat/multilingual-e5-large"

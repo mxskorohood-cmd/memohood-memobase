@@ -29,8 +29,8 @@ Most AI agents have two problems. They have **amnesia** — close the chat and e
 
 - 🧠 **Memory that survives sessions** — the agent recalls what matters before every reply, on its own, instead of starting from zero each chat.
 - 📚 **Answers grounded in your own files** — a verbatim quote from your document, or an honest "not in here" — never a guess.
-- 🔒 **Local-first** — the database and your documents stay in a SQLite file on your disk; only the query text and the matched snippet ever leave it, headed to an embedding/rerank API.
-- 🪶 **Lightweight** — standard library plus light MIT/BSD dependencies. No PyTorch, no gigabytes of weights, no AGPL. Installs on a cheap 2–4 GB VPS in seconds.
+- 🔒 **Local-first** — the database and your documents stay in a SQLite file on your disk; only the query text and the matched snippet ever leave it, headed to an embedding/rerank API — or, with the [optional local embedder](#api-keys), nothing leaves at all for search.
+- 🪶 **Lightweight** — standard library plus light MIT/BSD dependencies. No PyTorch, no AGPL. The default cloud install carries no local weights and fits a 2–4 GB VPS in seconds; a fully-local embedding mode (ONNX, still no PyTorch) is opt-in.
 - 🔌 **Drop-in plugins** — installed through hermes' official extension points; the core is never patched.
 - 🔎 **Hybrid search** — full-text (FTS5/BM25) + vector, fused with RRF, so it finds by meaning *and* by exact term, code or name.
 - 🗣️ **Unusual sources** — whole YouTube channels (with a cost estimate up front), voice notes via Whisper with real timecodes, read-only Obsidian vaults.
@@ -98,6 +98,35 @@ plugins/hermes-kb/install.sh        # or install.ps1 on Windows
 Exact, verified steps (config keys, required API keys, degradation without keys):
 → [plugins/memohood/GUIDE.md](plugins/memohood/GUIDE.md) · [plugins/hermes-kb/GUIDE.md](plugins/hermes-kb/GUIDE.md)
 
+## API keys
+
+Both plugins call a few cloud APIs; most have a free tier. The [hermes-setup](plugins/hermes-setup/) wizard can collect them for you, or add them to `.env` by hand.
+
+| Key | What it powers | Where to get it | Needed for |
+|---|---|---|---|
+| `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` | Embeddings — BGE-M3 via Workers AI (the vector half of hybrid search) | [dash.cloudflare.com](https://dash.cloudflare.com) → AI → Workers AI | **Core** — or use the local embedder below |
+| `GEMINI_API_KEY` | Fact extraction (MemoHood) and answer synthesis (MemoBase) | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | Both (degrades gracefully if absent) |
+| `COHERE_API_KEY` | Optional reranker (falls back to RRF-only) | [dashboard.cohere.com/api-keys](https://dashboard.cohere.com/api-keys) | Optional |
+| `GROQ_API_KEY` | Audio/voice transcription (Whisper) | [console.groq.com/keys](https://console.groq.com/keys) | MemoBase — audio only |
+| `APIFY_TOKEN` | Ingesting whole YouTube channels | [console.apify.com](https://console.apify.com/account/integrations) | MemoBase — YouTube only |
+| `SCRAPECREATORS_API_KEY` | YouTube transcripts/metadata | [scrapecreators.com](https://scrapecreators.com) | MemoBase — YouTube only |
+
+**Prefer local embeddings, no Cloudflare?** Install the local embedder — it downloads once and runs on CPU, so no embedding call ever leaves your machine and no Cloudflare key is needed:
+
+```bash
+plugins/hermes-kb/install.sh --local     # Windows:  install.ps1 -Local
+```
+
+It adds [`fastembed`](https://github.com/qdrant/fastembed) (ONNX Runtime — **no PyTorch**) and downloads `intfloat/multilingual-e5-large` (~2.2 GB, once). Then in `config.yaml`:
+
+```yaml
+memobase:
+  embedder: { provider: local, model: intfloat/multilingual-e5-large, dims: 1024 }
+# MemoHood memory uses the same keys under:  memory.memohood.embedder
+```
+
+Needs ~2 GB RAM. This makes only *embeddings* local — fact-extraction and answer-writing still use an LLM (Gemini or your host model). Without Cloudflare **and** without the local embedder, search falls back to full-text (FTS5) only and MemoBase can't index new documents.
+
 ## Tools each plugin adds
 
 | MemoHood | MemoBase |
@@ -134,7 +163,9 @@ The direction — hybrid search with RRF, "answer only from sources", versioned 
 
 **Does my data leave my machine?** Your documents and the database stay local. Only the **query text and the matched snippet** go out — to the embedding API (Cloudflare BGE-M3), the optional reranker (Cohere), and, for fact extraction, one Gemini call. Nothing gets uploaded wholesale.
 
-**Do I need a GPU?** No. There is no PyTorch and no local model weights.
+**Do I need a GPU?** No — CPU only, no PyTorch. The default install keeps embeddings in the cloud (no local weights); the optional local mode downloads a CPU ONNX model (still no PyTorch).
+
+**Can I run without Cloudflare?** Yes — the opt-in local embedder (fastembed / ONNX, no PyTorch) replaces it; see [API keys](#api-keys). Fact-extraction and answers still use an LLM.
 
 **Does it modify hermes?** No. Both plugins use hermes' official extension points only; the core is never patched.
 
@@ -146,9 +177,9 @@ The direction — hybrid search with RRF, "answer only from sources", versioned 
 
 ## Limitations
 
-- **Not fully offline.** Embeddings, optional rerank and fact-extraction are cloud API calls — the query text and snippets go out to them. The database and documents stay on your disk.
+- **Not fully offline.** Fact-extraction and answers are LLM API calls even with local embeddings; in the default (cloud) mode, embeddings and optional rerank go out too. The database and documents always stay on your disk.
 - **Needs a host.** Requires `hermes-agent ≥ 0.18`; these are plugins, not a standalone app.
-- **Keys for full power.** Cloudflare (embeddings), Gemini (extraction) and, for MemoBase, source keys (Groq/Cohere/etc.) unlock full functionality; without them the plugins degrade gracefully rather than fail.
+- **Embeddings need a backend.** Either a Cloudflare key (cloud) or the opt-in local embedder — see [API keys](#api-keys). Without either, search is full-text-only and MemoBase can't index new documents. Gemini (extraction), Cohere (rerank) and the YouTube/audio source keys are optional and degrade gracefully.
 - **Install tested on Windows and Linux** (PowerShell and POSIX installers provided).
 
 ## Status
@@ -161,4 +192,4 @@ MIT — free for personal and commercial use. © Maxim Vasko. See [LICENSE](LICE
 
 ---
 
-<p align="center">Made by <b>Maxim Vasko</b> · <a href="https://skorehood.com">skorehood.com</a> · <a href="https://www.youtube.com/@MaximSkorohood">YouTube @MaximSkorohood</a></p>
+<p align="center">Made by <b>Maxim Vasko</b> · <a href="https://skorehood.com">skorehood.com</a> · <a href="https://www.youtube.com/@MaximSkorohood">YouTube @MaximSkorohood</a> · <a href="https://t.me/+XrhmiKgCQdY5MjFi">Telegram</a></p>

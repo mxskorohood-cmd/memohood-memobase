@@ -17,7 +17,8 @@
   <a href="#settings">Settings</a> ·
   <a href="#tools-14-and-commands">Tools</a> ·
   <a href="README.md">Русский</a> ·
-  <a href="https://skorehood.com">skorehood.com</a>
+  <a href="https://skorehood.com">skorehood.com</a> ·
+  <a href="https://t.me/+XrhmiKgCQdY5MjFi">Telegram</a>
 </p>
 
 ---
@@ -271,7 +272,7 @@ A step-by-step guide to installation, first ingestion, asking questions, collect
 
 ## Author
 
-Made by **Maxim Vasko** — [skorehood.com](https://skorehood.com) · [YouTube @MaximSkorohood](https://www.youtube.com/@MaximSkorohood)
+Made by **Maxim Vasko** — [skorehood.com](https://skorehood.com) · [YouTube @MaximSkorohood](https://www.youtube.com/@MaximSkorohood) · [Telegram](https://t.me/+XrhmiKgCQdY5MjFi)
 
 ## License
 

@@ -13,11 +13,23 @@
 # Usage:
 #   ./install.sh                       # auto-detect the hermes venv python
 #   ./install.sh /path/to/venv/bin/python
+#   ./install.sh --local               # ALSO install the local embedder
+#                                      #   (fastembed, ONNX, no PyTorch) and
+#                                      #   pre-download multilingual-e5-large
+#                                      #   (~2.2 GB) so no CLOUDFLARE_* keys
+#                                      #   are needed for embeddings.
 #   HERMES_VENV_PYTHON=/path/to/python ./install.sh
 
 set -euo pipefail
 
-PYTHON_OVERRIDE="${1:-}"
+PYTHON_OVERRIDE=""
+INSTALL_LOCAL=0
+for arg in "$@"; do
+    case "$arg" in
+        --local) INSTALL_LOCAL=1 ;;
+        *) PYTHON_OVERRIDE="$arg" ;;
+    esac
+done
 
 resolve_hermes_venv_python() {
     if [ -n "$PYTHON_OVERRIDE" ]; then
@@ -78,6 +90,22 @@ echo "MemoBase: устанавливаю зависимости в $PYTHON"
     py3langid \
     PyStemmer \
     requests
+
+if [ "$INSTALL_LOCAL" = "1" ]; then
+    echo ""
+    echo "MemoBase: ставлю локальный эмбеддер (fastembed — ONNX Runtime, без PyTorch)..."
+    "$PYTHON" -m pip install --upgrade fastembed
+    echo "MemoBase: скачиваю модель intfloat/multilingual-e5-large (~2.2 ГБ, один раз)..."
+    "$PYTHON" - <<'PYEOF'
+from fastembed import TextEmbedding
+TextEmbedding(model_name="intfloat/multilingual-e5-large")
+print("  локальная модель готова к работе")
+PYEOF
+    echo "MemoBase: локальный режим установлен. Включите его в config.yaml (memobase.*):"
+    echo "    memobase:"
+    echo "      embedder: { provider: local, model: intfloat/multilingual-e5-large, dims: 1024 }"
+    echo "  (для памяти MemoHood — те же ключи под memory.memohood.embedder)"
+fi
 
 echo ""
 echo "MemoBase: зависимости установлены успешно."

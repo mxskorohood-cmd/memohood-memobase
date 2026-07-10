@@ -241,7 +241,7 @@ def _vector_search(conn: sqlite3.Connection, query: str, limit: int, cfg: Dict[s
         return []
 
     try:
-        vectors = embed_mod.embed_texts([query], cfg)
+        vectors = embed_mod.embed_texts([query], cfg, is_query=True)
     except embed_mod.EmbedError as exc:
         logger.warning("retrieve: query embedding failed (%s); vector leg empty for this query", exc)
         return []

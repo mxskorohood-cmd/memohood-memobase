@@ -16,7 +16,8 @@
   <a href="#частые-вопросы">FAQ</a> ·
   <a href="README.en.md">English</a> ·
   <a href="https://skorehood.com">skorehood.com</a> ·
-  <a href="https://www.youtube.com/@MaximSkorohood">YouTube</a>
+  <a href="https://www.youtube.com/@MaximSkorohood">YouTube</a> ·
+  <a href="https://t.me/+XrhmiKgCQdY5MjFi">Telegram</a>
 </p>
 
 ---
@@ -277,7 +278,7 @@ python -m pytest tests -q -m "not integration"
 
 ## Made by
 
-Сделано **Maxim Vasko** — [skorehood.com](https://skorehood.com) · [YouTube](https://www.youtube.com/@MaximSkorohood)
+Сделано **Maxim Vasko** — [skorehood.com](https://skorehood.com) · [YouTube](https://www.youtube.com/@MaximSkorohood) · [Telegram](https://t.me/+XrhmiKgCQdY5MjFi)
 
 ## Лицензия
 

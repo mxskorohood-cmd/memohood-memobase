@@ -380,6 +380,43 @@ class TestEmbed:
         vecs = kb.embed.embed_texts(["hello"], {"embedder": {"provider": "cloudflare", "dims": 3}})
         assert vecs == [[0.1, 0.2, 0.3]]
 
+    def test_apply_e5_prefix(self, kb):
+        assert kb.embed._apply_e5_prefix(["a"], "intfloat/multilingual-e5-large", True) == ["query: a"]
+        assert kb.embed._apply_e5_prefix(["a"], "intfloat/multilingual-e5-large", False) == ["passage: a"]
+        # non-e5 models (e.g. Cloudflare bge-m3) are left untouched
+        assert kb.embed._apply_e5_prefix(["a"], "@cf/baai/bge-m3", True) == ["a"]
+
+    def test_embed_texts_local_provider(self, kb, monkeypatch):
+        """provider=local dispatches to fastembed, converts to list[float], and
+        applies the e5 query/passage prefix based on is_query."""
+        captured = {}
+
+        class _FakeModel:
+            def embed(self, texts):
+                captured["texts"] = list(texts)
+                return [[0.5, 0.5, 0.5, 0.5] for _ in captured["texts"]]
+
+        monkeypatch.setattr(kb.embed, "_get_local_model", lambda model: _FakeModel())
+        cfg = {"embedder": {"provider": "local", "model": "intfloat/multilingual-e5-large", "dims": 4}}
+
+        vecs = kb.embed.embed_texts(["документ"], cfg)  # passage side (default)
+        assert vecs == [[0.5, 0.5, 0.5, 0.5]]
+        assert all(isinstance(x, float) for x in vecs[0])
+        assert captured["texts"] == ["passage: документ"]
+
+        kb.embed.embed_texts(["вопрос"], cfg, is_query=True)  # query side
+        assert captured["texts"] == ["query: вопрос"]
+
+    def test_embed_texts_local_missing_fastembed_raises(self, kb, monkeypatch):
+        import sys
+
+        kb.embed._LOCAL_MODELS.clear()
+        monkeypatch.setitem(sys.modules, "fastembed", None)  # mark unimportable
+        cfg = {"embedder": {"provider": "local", "model": "intfloat/multilingual-e5-large", "dims": 4}}
+        with pytest.raises(kb.embed.EmbedError) as ei:
+            kb.embed.embed_texts(["x"], cfg)
+        assert "fastembed" in str(ei.value)
+
     def test_serialize_vector_roundtrip_shape(self, kb):
         raw = kb.embed.serialize_vector([0.1, 0.2, 0.3])
         assert isinstance(raw, (bytes, bytearray))

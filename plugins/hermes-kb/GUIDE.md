@@ -21,7 +21,16 @@
 
    На Linux/macOS — `./install.sh` (или `./install.sh /путь/к/venv/bin/python`).
 
-3. Проверьте, что в `~/.hermes/.env` есть три ключа:
+   **Локальные эмбеддинги без Cloudflare (опционально).** Добавьте флаг `--local` (bash) или `-Local` (PowerShell) — скрипт дополнительно поставит `fastembed` (ONNX Runtime, **без PyTorch**) и скачает модель `intfloat/multilingual-e5-large` (~2.2 ГБ, один раз). Затем пропишите в `config.yaml`:
+
+   ```yaml
+   memobase:
+     embedder: { provider: local, model: intfloat/multilingual-e5-large, dims: 1024 }
+   ```
+
+   Тогда для эмбеддингов ключи Cloudflare не нужны и текст запроса/сниппетов никуда не уходит. Нужно ~2 ГБ свободной RAM. Важно: извлечение и синтез ответа по-прежнему делает LLM (Gemini/хостовая модель) — это отдельно от эмбеддингов. Мастер (`hermes memobase setup`) тоже предложит локальный вариант.
+
+3. Проверьте, что в `~/.hermes/.env` есть три ключа (**кроме случая локального эмбеддера выше** — тогда Cloudflare можно пропустить):
 
    ```
    CLOUDFLARE_ACCOUNT_ID=...

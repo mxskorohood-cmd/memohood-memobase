@@ -16,7 +16,8 @@
   <a href="#faq">FAQ</a> ·
   <a href="README.md">Русский</a> ·
   <a href="https://skorehood.com">skorehood.com</a> ·
-  <a href="https://www.youtube.com/@MaximSkorohood">YouTube</a>
+  <a href="https://www.youtube.com/@MaximSkorohood">YouTube</a> ·
+  <a href="https://t.me/+XrhmiKgCQdY5MjFi">Telegram</a>
 </p>
 
 ---
@@ -277,7 +278,7 @@ A practical guide to installation, diagnostics, and how fact capture works is in
 
 ## Made by
 
-Built by **Maxim Vasko** — [skorehood.com](https://skorehood.com) · [YouTube](https://www.youtube.com/@MaximSkorohood)
+Built by **Maxim Vasko** — [skorehood.com](https://skorehood.com) · [YouTube](https://www.youtube.com/@MaximSkorohood) · [Telegram](https://t.me/+XrhmiKgCQdY5MjFi)
 
 ## License
 

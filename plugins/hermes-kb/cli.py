@@ -233,6 +233,13 @@ def _run_cli_setup_wizard() -> None:
     elif choice in ("1", "2"):
         kb_config.set_memobase_value("embedder.provider", "local")
         kb_config.set_memobase_value("embedder.model", setup_core.local_embedder_model(choice))
+        kb_config.set_memobase_value("embedder.dims", 1024)
+        print(
+            "Локальный режим выбран (multilingual-e5-large, 1024-dim). Если локальный движок ещё "
+            "не установлен — выполните `plugins/memobase/install.sh --local` (или "
+            "`install.ps1 -Local`): поставит fastembed и скачает модель (~2.2 ГБ). "
+            "Без этого первый запрос попросит `pip install fastembed`."
+        )
     else:
         print("Не понял выбор — оставляю текущие настройки эмбеддера без изменений.")
 

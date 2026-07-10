@@ -220,9 +220,15 @@ def handle_message(chat_id: str, user_id: str, text: str, memobase_cfg: Dict[str
 
                 kb_config.set_memobase_value("embedder.provider", "local")
                 kb_config.set_memobase_value("embedder.model", setup_core.local_embedder_model(choice))
+                kb_config.set_memobase_value("embedder.dims", 1024)
             except Exception:
                 logger.warning("wizard: failed to persist local embedder choice", exc_info=True)
-            return _advance_to(chat_id, entry, "first_ingest", prefix=detect_obsidian_message())
+            local_note = (
+                "Локальный эмбеддер выбран (multilingual-e5-large). Если на сервере ещё не "
+                "установлен fastembed — выполните `install.sh --local`, иначе первый запрос "
+                "попросит его поставить.\n\n"
+            )
+            return _advance_to(chat_id, entry, "first_ingest", prefix=local_note + detect_obsidian_message())
         return "Не понял ответ — пришлите 1, 2 или 3.\n\n" + _question_for("embedder", entry)
 
     if step == "cloud_provider":
