@@ -30,6 +30,7 @@ Most AI agents have two problems. They have **amnesia** — close the chat and e
 - 🧠 **Memory that survives sessions** — the agent recalls what matters before every reply, on its own, instead of starting from zero each chat.
 - 📚 **Answers grounded in your own files** — a verbatim quote from your document, or an honest "not in here" — never a guess.
 - 🔒 **Local-first** — the database and your documents stay in a SQLite file on your disk; only the query text and the matched snippet ever leave it, headed to an embedding/rerank API — or, with the [optional local embedder](#api-keys), nothing leaves at all for search.
+- 🖥️ **Cloud or fully local — your call** — by default embeddings run on a free Cloudflare tier; or install a local ONNX model (`fastembed`, no PyTorch, no key) right at setup and no search query ever leaves your machine. The wizard asks which one you want. [How →](#api-keys)
 - 🪶 **Lightweight** — standard library plus light MIT/BSD dependencies. No PyTorch, no AGPL. The default cloud install carries no local weights and fits a 2–4 GB VPS in seconds; a fully-local embedding mode (ONNX, still no PyTorch) is opt-in.
 - 🔌 **Drop-in plugins** — installed through hermes' official extension points; the core is never patched.
 - 🔎 **Hybrid search** — full-text (FTS5/BM25) + vector, fused with RRF, so it finds by meaning *and* by exact term, code or name.
