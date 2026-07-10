@@ -1,0 +1,34 @@
+name: hermes-setup
+version: 0.1.0
+description: >
+  Мастер первоначальной настройки: включает и настраивает остальные плагины
+  hermes-agent (token-guard, MemoBase, MemoHood) прямо из чата — по шагам, один
+  вопрос за раз, простым языком и с проверкой ключей перед сохранением.
+  Работает и в Telegram (через /setup), и в обычном CLI-сеансе hermes.
+  Сам по себе ничего не меняет в поведении модели — только помогает
+  включить и настроить другие плагины. Особый случай: MemoHood — провайдер
+  памяти, у него нет своего способа запуститься из чата, пока
+  memory.provider не указывает на него, поэтому именно hermes-setup
+  переключает этот ключ.
+author: Maxim Vasko
+kind: standalone
+
+# NOTE (see hermes-kb/plugin.yaml's identical note, API_CONTRACT_PLUGINS.md
+# §1): the loader currently reads only
+# name/version/description/author/requires_env/provides_tools/provides_hooks/kind
+# from this manifest — hermes_core_min_version below is a human/CI-readable
+# note only, not an enforced gate.
+hermes_core_min_version: "0.18.0"
+
+# hermes-setup needs no API keys of its own — it only WRITES other plugins'
+# keys into .env via envfile.upsert_env_value, never reads them for itself.
+requires_env: []
+
+provides_tools: []
+
+# pre_gateway_dispatch: intercepts `/setup` and any wizard-in-progress reply
+# BEFORE the LLM ever sees it (same rationale as MemoBase's own /memobase setup
+# wizard — plain text/numbered answers must never reach the model, and a
+# pasted API key must never enter model context or session history).
+provides_hooks:
+  - pre_gateway_dispatch

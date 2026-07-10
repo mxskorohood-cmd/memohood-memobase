@@ -1,0 +1,31 @@
+# venv / окружения
+.venv/
+venv/
+env/
+
+# кэши питона/инструментов
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# локальные БД и артефакты
+dev.db
+*.db-journal
+excalidraw.log
+.scratch_tmp/
+.scratch/
+
+# упакованные снапшоты плагинов
+plugins/token-guard.zip
+
+# секреты
+.env
+*.env
+!.env.example
+
+# внутренние промо-черновики (не публиковать в репозитории)
+PROMO_YOUTUBE.md
+PROMO_LAUNCH_POSTS.md
+POSTING_GUIDE.md
