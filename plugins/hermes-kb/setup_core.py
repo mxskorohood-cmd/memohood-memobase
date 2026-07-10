@@ -46,9 +46,13 @@ logger = logging.getLogger("memobase.setup_core")
 # (no persistence needed — the whole flow runs in one process, uninterrupted).
 # ---------------------------------------------------------------------------
 
-STEPS = ("embedder", "cloud_provider", "cloud_key", "first_ingest", "control_question", "done")
+STEPS = ("embedder", "embedder_confirm", "cloud_provider", "cloud_key", "first_ingest", "control_question", "done")
 
 CLOUD_PROVIDERS = {"1": "cloudflare", "2": "cohere", "3": "openai"}
+
+# The single supported local embedder: fastembed (ONNX Runtime, no PyTorch),
+# 1024-dim (drop-in for the Cloudflare bge-m3 schema), multilingual, MIT.
+LOCAL_EMBED_MODEL = "intfloat/multilingual-e5-large"
 
 
 # ---------------------------------------------------------------------------
@@ -421,17 +425,36 @@ def format_dependency_report(report: Dict[str, Any]) -> str:
 def embedder_question(ram_gb: Optional[float]) -> str:
     hint = f" (у вас примерно {ram_gb} ГБ RAM)" if ram_gb else ""
     # Local e5-large needs ~2 GB RAM to run; on a low-RAM box recommend cloud.
-    rec = " — рекомендуется вариант 1" if ram_gb and ram_gb >= 8 else (" — здесь мало RAM, рекомендуется вариант 3" if ram_gb else "")
+    rec = " — рекомендуется вариант 1" if ram_gb and ram_gb >= 8 else (" — здесь мало RAM, рекомендуется вариант 2" if ram_gb else "")
     return (
         "Настройка базы знаний MemoBase.\n"
         "Где считать эмбеддинги? Эмбеддинг — это перевод текста на язык чисел, "
         "чтобы компьютер сравнивал смысл фраз, а не просто буквы."
         f"{hint}{rec}\n"
         "1 — на этой машине, локально: модель multilingual-e5-large "
-        "(~2.2 ГБ, скачивается один раз; облачные ключи для эмбеддингов не нужны)\n"
-        "2 — тоже локально (та же модель, что и вариант 1)\n"
-        "3 — через облако: Cloudflare Workers AI (нужен бесплатный API-ключ; ничего не скачивается)"
+        "(~2.2 ГБ, скачается один раз; дальше без облака и без ключей для эмбеддингов)\n"
+        "2 — через облако: Cloudflare Workers AI и др. (нужен бесплатный API-ключ; ничего не скачивать)"
     )
+
+
+def local_confirm_question() -> str:
+    """Warning + confirm shown after the user picks the local embedder."""
+    return (
+        "Локальный режим. Сейчас будет:\n"
+        "• установлен fastembed (движок эмбеддингов на ONNX, без PyTorch) — небольшой пакет;\n"
+        f"• скачана модель {LOCAL_EMBED_MODEL} — ~2.2 ГБ (один раз).\n"
+        "Нужно ~2 ГБ свободной RAM. После этого эмбеддинги считаются на твоей машине, "
+        "облачные ключи для них не нужны.\n\n"
+        "Продолжить? «да» — начну ставить и качать; «назад» — вернуться к выбору."
+    )
+
+
+def is_affirmative(text: str) -> bool:
+    return (text or "").strip().lower() in {"да", "д", "y", "yes", "ok", "ок", "продолжить", "go"}
+
+
+def is_back(text: str) -> bool:
+    return (text or "").strip().lower() in {"назад", "back", "нет", "n", "no", "отмена", "cancel"}
 
 
 def cloud_provider_question() -> str:
@@ -462,8 +485,38 @@ def done_message() -> str:
     return "Настройка завершена. Шпаргалка: спросить — просто вопросом; добавить — «добавь в базу ...»; статус — /memobase status."
 
 
-def local_embedder_model(choice: str) -> str:
-    """The local-embedder model id. Single supported local model: a fastembed
-    (ONNX, no PyTorch) multilingual model at 1024 dims — a drop-in for the
-    Cloudflare bge-m3 schema. Both menu choices map to it."""
-    return "intfloat/multilingual-e5-large"
+def local_embedder_model() -> str:
+    """The local-embedder model id — a fastembed (ONNX, no PyTorch) multilingual
+    model at 1024 dims, drop-in for the Cloudflare bge-m3 schema."""
+    return LOCAL_EMBED_MODEL
+
+
+def install_local_embedder(model: str = LOCAL_EMBED_MODEL) -> Tuple[bool, str]:
+    """Install ``fastembed`` into the CURRENT interpreter's venv (the hermes
+    venv, since the plugin runs inside it) and pre-download *model*, so the
+    first real query is instant. Blocking — pip output streams to the terminal.
+    Returns ``(ok, message)`` and never raises: on failure it points at the
+    manual ``install.sh --local`` path instead."""
+    import subprocess
+    import sys
+
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--upgrade", "fastembed"],
+            check=True,
+        )
+    except Exception as exc:  # noqa: BLE001 - onboarding must never crash
+        return False, (
+            f"не удалось установить fastembed ({exc}). Поставьте вручную: "
+            "plugins/memobase/install.sh --local (или install.ps1 -Local)."
+        )
+    try:
+        from fastembed import TextEmbedding
+
+        TextEmbedding(model_name=model)
+    except Exception as exc:  # noqa: BLE001
+        return False, (
+            f"fastembed установлен, но модель не скачалась ({exc}). "
+            "Повторите позже или запустите install.sh --local."
+        )
+    return True, "локальный движок готов: модель скачана, эмбеддинги считаются на этой машине."

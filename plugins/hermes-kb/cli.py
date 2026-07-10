@@ -200,17 +200,39 @@ def _run_cli_setup_wizard() -> None:
     print()
 
     ram = setup_core.detect_ram_gb()
-    print(setup_core.embedder_question(ram))
-    choice = input("> ").strip()
+    while True:
+        print(setup_core.embedder_question(ram))
+        choice = input("> ").strip()[:1]
 
-    if choice == "3":
-        print()
-        print(setup_core.cloud_provider_question())
-        provider_choice = input("> ").strip()
-        provider = setup_core.CLOUD_PROVIDERS.get(provider_choice)
-        if provider is None:
-            print("Не понял выбор провайдера — оставляю текущие настройки эмбеддера без изменений.")
-        else:
+        if choice == "1":  # local embedder
+            print()
+            print(setup_core.local_confirm_question())
+            ans = input("> ").strip()
+            if setup_core.is_back(ans):
+                print()
+                continue  # back to the start of the embedder choice
+            if not setup_core.is_affirmative(ans):
+                print("Не понял ответ — возвращаюсь к выбору.\n")
+                continue
+            print("\nСтавлю локальный движок и качаю модель (~2.2 ГБ, один раз)…")
+            ok, msg = setup_core.install_local_embedder()
+            print(msg)
+            if ok:
+                kb_config.set_memobase_value("embedder.provider", "local")
+                kb_config.set_memobase_value("embedder.model", setup_core.local_embedder_model())
+                kb_config.set_memobase_value("embedder.dims", 1024)
+            else:
+                print("Локальный режим не настроен — можно повторить позже или выбрать облако.")
+            break
+
+        if choice == "2":  # cloud embedder
+            print()
+            print(setup_core.cloud_provider_question())
+            provider_choice = input("> ").strip()
+            provider = setup_core.CLOUD_PROVIDERS.get(provider_choice)
+            if provider is None:
+                print("Не понял выбор провайдера — оставляю текущие настройки эмбеддера без изменений.")
+                break
             kb_config.set_memobase_value("embedder.provider", provider)
             env_var = setup_core.CLOUD_KEY_ENV.get(provider, "API_KEY")
             print()
@@ -230,18 +252,9 @@ def _run_cli_setup_wizard() -> None:
                 print(hint)
                 if attempt == _MAX_ATTEMPTS:
                     print("Не получилось получить ключ подходящего формата — настройте его позже вручную в .env.")
-    elif choice in ("1", "2"):
-        kb_config.set_memobase_value("embedder.provider", "local")
-        kb_config.set_memobase_value("embedder.model", setup_core.local_embedder_model(choice))
-        kb_config.set_memobase_value("embedder.dims", 1024)
-        print(
-            "Локальный режим выбран (multilingual-e5-large, 1024-dim). Если локальный движок ещё "
-            "не установлен — выполните `plugins/memobase/install.sh --local` (или "
-            "`install.ps1 -Local`): поставит fastembed и скачает модель (~2.2 ГБ). "
-            "Без этого первый запрос попросит `pip install fastembed`."
-        )
-    else:
-        print("Не понял выбор — оставляю текущие настройки эмбеддера без изменений.")
+            break
+
+        print("Не понял выбор — напишите 1 (локально) или 2 (облако).\n")
 
     print()
     print(setup_core.detect_obsidian_message())

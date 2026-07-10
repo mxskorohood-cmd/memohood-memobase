@@ -365,9 +365,12 @@ class TestWizard:
     def test_wizard_advances_through_local_embedder_path(self, kb):
         kb.wizard.start_wizard("chat-2", "user-2")
         reply = kb.wizard.handle_message("chat-2", "user-2", "1", memobase_cfg={})
-        # local embedder choice (1) skips straight to first_ingest, with an
-        # Obsidian auto-detect notice prepended
-        assert "загруз" in reply.lower() or "файл" in reply.lower()
+        # local choice (1) now shows a download-confirm step (warns ~2.2 GB)
+        assert "2.2" in reply and ("да" in reply.lower() or "продолж" in reply.lower())
+
+        confirm = kb.wizard.handle_message("chat-2", "user-2", "да", memobase_cfg={})
+        # confirming advances to first_ingest, with the Obsidian notice prepended
+        assert "загруз" in confirm.lower() or "файл" in confirm.lower()
 
         reply2 = kb.wizard.handle_message("chat-2", "user-2", "some/path/to/file", memobase_cfg={})
         assert "вопрос" in reply2.lower() or "цитат" in reply2.lower()
@@ -375,6 +378,13 @@ class TestWizard:
         reply3 = kb.wizard.handle_message("chat-2", "user-2", "what is X?", memobase_cfg={})
         assert "заверш" in reply3.lower() or "шпаргалка" in reply3.lower() or "статус" in reply3.lower()
         assert kb.wizard.is_active("chat-2") is False
+
+    def test_wizard_local_confirm_back_returns_to_embedder(self, kb):
+        kb.wizard.start_wizard("chat-b", "user-b")
+        kb.wizard.handle_message("chat-b", "user-b", "1", memobase_cfg={})  # -> confirm step
+        back = kb.wizard.handle_message("chat-b", "user-b", "назад", memobase_cfg={})
+        assert "эмбеддинги" in back.lower() or "где считать" in back.lower()
+        assert kb.wizard.is_active("chat-b") is True
 
     def test_wizard_advances_through_cloud_key_path(self, kb, monkeypatch):
         monkeypatch.setattr(kb.wizard, "validate_provider_key", lambda provider: (True, "ok"))
@@ -385,7 +395,7 @@ class TestWizard:
         # os.environ[...] = ... write made by the code under test.
         monkeypatch.delenv("CLOUDFLARE_API_TOKEN", raising=False)
         kb.wizard.start_wizard("chat-3", "user-3")
-        reply = kb.wizard.handle_message("chat-3", "user-3", "3", memobase_cfg={})
+        reply = kb.wizard.handle_message("chat-3", "user-3", "2", memobase_cfg={})
         assert "провайдер" in reply.lower()
 
         reply2 = kb.wizard.handle_message("chat-3", "user-3", "1", memobase_cfg={})

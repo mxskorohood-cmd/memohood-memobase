@@ -230,7 +230,8 @@ class TestDependencyCheck:
 class TestStepSequencing:
     def test_steps_order(self, kb):
         assert kb.setup_core.STEPS == (
-            "embedder", "cloud_provider", "cloud_key", "first_ingest", "control_question", "done",
+            "embedder", "embedder_confirm", "cloud_provider", "cloud_key",
+            "first_ingest", "control_question", "done",
         )
 
     def test_cloud_providers_mapping(self, kb):
@@ -243,10 +244,15 @@ class TestStepSequencing:
             "openai": "OPENAI_API_KEY",
         }
 
-    def test_local_embedder_model_mapping(self, kb):
+    def test_local_embedder_model_is_e5_large(self, kb):
         # Single supported local model (fastembed, 1024-dim, drop-in for bge-m3).
-        assert kb.setup_core.local_embedder_model("1") == "intfloat/multilingual-e5-large"
-        assert kb.setup_core.local_embedder_model("2") == "intfloat/multilingual-e5-large"
+        assert kb.setup_core.local_embedder_model() == "intfloat/multilingual-e5-large"
+
+    def test_embedder_question_two_options_local_and_cloud(self, kb):
+        text = kb.setup_core.embedder_question(16.0)
+        # Exactly the two options, no redundant duplicate local line.
+        assert "1 —" in text and "2 —" in text and "3 —" not in text
+        assert "локально" in text.lower() and "облак" in text.lower()
 
     def test_embedder_question_mentions_ram_and_recommends_full_variant(self, kb):
         text = kb.setup_core.embedder_question(16.0)
@@ -254,13 +260,46 @@ class TestStepSequencing:
         assert "вариант 1" in text
 
     def test_embedder_question_recommends_cloud_for_low_ram(self, kb):
-        # Local e5-large needs ~2 GB RAM; a low-RAM box is steered to cloud.
+        # Local e5-large needs ~2 GB RAM; a low-RAM box is steered to cloud (option 2).
         text = kb.setup_core.embedder_question(4.0)
-        assert "вариант 3" in text
+        assert "вариант 2" in text
 
     def test_embedder_question_handles_unknown_ram(self, kb):
         text = kb.setup_core.embedder_question(None)
         assert "эмбеддинги" in text.lower() or "где считать" in text.lower()
+
+    def test_local_confirm_question_warns_about_download(self, kb):
+        text = kb.setup_core.local_confirm_question()
+        assert "2.2" in text and "fastembed" in text.lower()
+        assert "да" in text.lower() and "назад" in text.lower()
+
+    def test_affirmative_and_back_parsers(self, kb):
+        assert kb.setup_core.is_affirmative("да") and kb.setup_core.is_affirmative("Y")
+        assert kb.setup_core.is_back("назад") and kb.setup_core.is_back("back")
+        assert not kb.setup_core.is_affirmative("назад")
+        assert not kb.setup_core.is_back("да")
+
+    def test_install_local_embedder_success_mocked(self, kb, monkeypatch):
+        import subprocess
+        import sys
+        import types
+
+        monkeypatch.setattr(subprocess, "run", lambda *a, **k: None)
+        fake = types.ModuleType("fastembed")
+        fake.TextEmbedding = lambda *a, **k: object()
+        monkeypatch.setitem(sys.modules, "fastembed", fake)
+        ok, msg = kb.setup_core.install_local_embedder()
+        assert ok is True and "готов" in msg.lower()
+
+    def test_install_local_embedder_pip_failure_mocked(self, kb, monkeypatch):
+        import subprocess
+
+        def _boom(*a, **k):
+            raise RuntimeError("pip down")
+
+        monkeypatch.setattr(subprocess, "run", _boom)
+        ok, msg = kb.setup_core.install_local_embedder()
+        assert ok is False and "install.sh --local" in msg
 
     def test_cloud_provider_question_lists_all_three(self, kb):
         text = kb.setup_core.cloud_provider_question()

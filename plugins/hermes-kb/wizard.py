@@ -173,6 +173,8 @@ def is_owner_allowed(user_id: Optional[str], memobase_cfg: Dict[str, Any]) -> bo
 def _question_for(step: str, entry: Dict[str, Any]) -> str:
     if step == "embedder":
         return setup_core.embedder_question(detect_ram_gb())
+    if step == "embedder_confirm":
+        return setup_core.local_confirm_question()
     if step == "cloud_provider":
         return setup_core.cloud_provider_question()
     if step == "cloud_key":
@@ -210,26 +212,40 @@ def handle_message(chat_id: str, user_id: str, text: str, memobase_cfg: Dict[str
 
     if step == "embedder":
         choice = text[:1]
-        if choice == "3":
+        if choice == "2":
             entry["step"] = "cloud_provider"
             _set_entry(chat_id, entry)
             return _question_for("cloud_provider", entry)
-        if choice in ("1", "2"):
-            try:
-                from . import config as kb_config
+        if choice == "1":
+            entry["step"] = "embedder_confirm"
+            _set_entry(chat_id, entry)
+            return _question_for("embedder_confirm", entry)
+        return "Не понял ответ — пришлите 1 (локально) или 2 (облако).\n\n" + _question_for("embedder", entry)
 
-                kb_config.set_memobase_value("embedder.provider", "local")
-                kb_config.set_memobase_value("embedder.model", setup_core.local_embedder_model(choice))
-                kb_config.set_memobase_value("embedder.dims", 1024)
-            except Exception:
-                logger.warning("wizard: failed to persist local embedder choice", exc_info=True)
-            local_note = (
-                "Локальный эмбеддер выбран (multilingual-e5-large). Если на сервере ещё не "
-                "установлен fastembed — выполните `install.sh --local`, иначе первый запрос "
-                "попросит его поставить.\n\n"
-            )
-            return _advance_to(chat_id, entry, "first_ingest", prefix=local_note + detect_obsidian_message())
-        return "Не понял ответ — пришлите 1, 2 или 3.\n\n" + _question_for("embedder", entry)
+    if step == "embedder_confirm":
+        if setup_core.is_back(text):
+            entry["step"] = "embedder"
+            _set_entry(chat_id, entry)
+            return _question_for("embedder", entry)
+        if not setup_core.is_affirmative(text):
+            return "Напишите «да» — продолжить, или «назад» — вернуться к выбору.\n\n" + _question_for("embedder_confirm", entry)
+        try:
+            from . import config as kb_config
+
+            kb_config.set_memobase_value("embedder.provider", "local")
+            kb_config.set_memobase_value("embedder.model", setup_core.local_embedder_model())
+            kb_config.set_memobase_value("embedder.dims", 1024)
+        except Exception:
+            logger.warning("wizard: failed to persist local embedder choice", exc_info=True)
+        # A ~2.2 GB download can't run inline inside a synchronous chat handler,
+        # so the Telegram path records the choice and points at the server-side
+        # install step (the terminal `hermes memobase setup` downloads inline).
+        local_note = (
+            "Локальный режим записан (multilingual-e5-large). Модель ~2.2 ГБ ставится на сервере: "
+            "выполните там `install.sh --local` (поставит fastembed и скачает модель). "
+            "Без этого первый запрос попросит поставить fastembed.\n\n"
+        )
+        return _advance_to(chat_id, entry, "first_ingest", prefix=local_note + detect_obsidian_message())
 
     if step == "cloud_provider":
         provider = CLOUD_PROVIDERS.get(text[:1])
